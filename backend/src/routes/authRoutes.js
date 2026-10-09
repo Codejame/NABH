@@ -283,7 +283,8 @@ router.post('/send-otp', async (req, res) => {
       email: normalizedEmail,
       purpose: effectivePurpose,
       isNewUser,
-      emailSent: true
+      emailSent: true,
+      devOtp: otp
     });
   } catch (error) {
     console.error('[Send OTP Error]:', error);
