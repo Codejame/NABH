@@ -41,6 +41,9 @@ const Login = () => {
   const [countdown, setCountdown] = useState(0);
   const [devOtpHint, setDevOtpHint] = useState('');
 
+  // Auth Method: 'password' | 'otp'
+  const [authMethod, setAuthMethod] = useState('password');
+
   // Form inputs
   const [formData, setFormData] = useState({
     name: '',
@@ -102,6 +105,49 @@ const Login = () => {
     setDevOtpHint('');
     setErrorMessage('');
     setSuccessMessage('');
+  };
+
+  // Customer Direct Password Authentication (Login & Register)
+  const handleCustomerPasswordSubmit = async (e) => {
+    e.preventDefault();
+    if (!formData.email.trim()) {
+      setErrorMessage('Please enter your email address.');
+      return;
+    }
+    if (!formData.password) {
+      setErrorMessage('Please enter your password.');
+      return;
+    }
+    if (isRegistering && !formData.name.trim()) {
+      setErrorMessage('Please enter your full name.');
+      return;
+    }
+
+    setLoading(true);
+    setErrorMessage('');
+    setSuccessMessage('');
+
+    try {
+      if (isRegistering) {
+        await register(
+          formData.name.trim(),
+          formData.email.trim(),
+          formData.password,
+          formData.phone.trim()
+        );
+        setSuccessMessage('Account created successfully! Welcome to NABH Wear.');
+      } else {
+        await login(formData.email.trim(), formData.password);
+        setSuccessMessage('Logged in successfully! Redirecting...');
+      }
+      setTimeout(() => {
+        navigate(redirectUrl, { replace: true });
+      }, 500);
+    } catch (err) {
+      setErrorMessage(err.message || (isRegistering ? 'Registration failed.' : 'Invalid email or password.'));
+    } finally {
+      setLoading(false);
+    }
   };
 
   // Step 1: Send OTP to Email
@@ -286,29 +332,50 @@ const Login = () => {
 
           {/* Customer Tab: Sign In vs Create Account */}
           {authRole === 'customer' && (
-            <div className="flex border-b border-[#1C1C1E] mb-6">
-              <button
-                type="button"
-                onClick={() => handleTabSwitch(false)}
-                className={`pb-3 text-xs uppercase tracking-wider font-mono font-medium border-b-2 mr-6 transition-all ${
-                  !isRegistering
-                    ? 'border-[#F9F9FB] text-[#F9F9FB]'
-                    : 'border-transparent text-[#8E8E93] hover:text-[#F9F9FB]'
-                }`}
-              >
-                Sign In with OTP
-              </button>
-              <button
-                type="button"
-                onClick={() => handleTabSwitch(true)}
-                className={`pb-3 text-xs uppercase tracking-wider font-mono font-medium border-b-2 transition-all ${
-                  isRegistering
-                    ? 'border-[#F9F9FB] text-[#F9F9FB]'
-                    : 'border-transparent text-[#8E8E93] hover:text-[#F9F9FB]'
-                }`}
-              >
-                Create Account
-              </button>
+            <div className="space-y-4 mb-6">
+              <div className="flex border-b border-[#1C1C1E]">
+                <button
+                  type="button"
+                  onClick={() => handleTabSwitch(false)}
+                  className={`pb-3 text-xs uppercase tracking-wider font-mono font-medium border-b-2 mr-6 transition-all ${
+                    !isRegistering
+                      ? 'border-[#F9F9FB] text-[#F9F9FB]'
+                      : 'border-transparent text-[#8E8E93] hover:text-[#F9F9FB]'
+                  }`}
+                >
+                  Sign In
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleTabSwitch(true)}
+                  className={`pb-3 text-xs uppercase tracking-wider font-mono font-medium border-b-2 transition-all ${
+                    isRegistering
+                      ? 'border-[#F9F9FB] text-[#F9F9FB]'
+                      : 'border-transparent text-[#8E8E93] hover:text-[#F9F9FB]'
+                  }`}
+                >
+                  Create Account
+                </button>
+              </div>
+
+              {/* Toggle Password vs OTP */}
+              <div className="flex items-center justify-between text-[11px] font-mono pt-1">
+                <span className="text-[#8E8E93]">
+                  {authMethod === 'password' ? 'Authenticating with Password' : 'Authenticating with Email OTP'}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAuthMethod(authMethod === 'password' ? 'otp' : 'password');
+                    setOtpSent(false);
+                    setErrorMessage('');
+                    setSuccessMessage('');
+                  }}
+                  className="text-amber-400 hover:text-amber-300 underline"
+                >
+                  {authMethod === 'password' ? 'Switch to Email OTP ➔' : 'Switch to Password ➔'}
+                </button>
+              </div>
             </div>
           )}
 
@@ -328,9 +395,119 @@ const Login = () => {
           )}
 
           {/* ========================================================= */}
-          {/* CUSTOMER OTP AUTHENTICATION FLOW                          */}
+          {/* CUSTOMER AUTHENTICATION (PASSWORD MODE)                   */}
           {/* ========================================================= */}
-          {authRole === 'customer' && (
+          {authRole === 'customer' && authMethod === 'password' && (
+            <form onSubmit={handleCustomerPasswordSubmit} className="space-y-4">
+              {/* Full Name for Register */}
+              {isRegistering && (
+                <div>
+                  <label className="block text-[11px] uppercase tracking-wider font-mono text-[#8E8E93] mb-1.5">
+                    Full Name
+                  </label>
+                  <div className="relative">
+                    <User size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#8E8E93]" />
+                    <input
+                      type="text"
+                      required
+                      placeholder="e.g. Partha Protim Mondal"
+                      value={formData.name}
+                      onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                      className="w-full bg-[#141416] border border-[#26262A] px-10 py-3 text-xs text-[#F9F9FB] placeholder-[#555] focus:outline-none focus:border-[#F9F9FB] transition-colors"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Email Address */}
+              <div>
+                <label className="block text-[11px] uppercase tracking-wider font-mono text-[#8E8E93] mb-1.5">
+                  Email Address
+                </label>
+                <div className="relative">
+                  <Mail size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#8E8E93]" />
+                  <input
+                    type="email"
+                    required
+                    placeholder="you@example.com"
+                    value={formData.email}
+                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                    className="w-full bg-[#141416] border border-[#26262A] px-10 py-3 text-xs text-[#F9F9FB] placeholder-[#555] focus:outline-none focus:border-[#F9F9FB] transition-colors font-mono"
+                  />
+                </div>
+              </div>
+
+              {/* Password */}
+              <div>
+                <label className="block text-[11px] uppercase tracking-wider font-mono text-[#8E8E93] mb-1.5">
+                  {isRegistering ? 'Create Password' : 'Password'}
+                </label>
+                <div className="relative">
+                  <Lock size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#8E8E93]" />
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    required
+                    placeholder="••••••••••••"
+                    value={formData.password}
+                    onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                    className="w-full bg-[#141416] border border-[#26262A] pl-10 pr-10 py-3 text-xs text-[#F9F9FB] placeholder-[#555] focus:outline-none focus:border-[#F9F9FB] transition-colors font-mono"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[#8E8E93] hover:text-[#F9F9FB]"
+                  >
+                    {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
+                  </button>
+                </div>
+              </div>
+
+              {/* Mobile Number for Register */}
+              {isRegistering && (
+                <div>
+                  <label className="block text-[11px] uppercase tracking-wider font-mono text-[#8E8E93] mb-1.5">
+                    Mobile Number (Optional)
+                  </label>
+                  <div className="relative">
+                    <Phone size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#8E8E93]" />
+                    <input
+                      type="tel"
+                      placeholder="10-digit mobile number"
+                      value={formData.phone}
+                      onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                      className="w-full bg-[#141416] border border-[#26262A] px-10 py-3 text-xs text-[#F9F9FB] placeholder-[#555] focus:outline-none focus:border-[#F9F9FB] transition-colors font-mono"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Submit Button */}
+              <div className="pt-2">
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="w-full py-3.5 px-6 bg-[#F9F9FB] text-[#0A0A0A] hover:bg-white text-xs uppercase tracking-widest font-mono font-bold flex items-center justify-center gap-2 transition-all disabled:opacity-50"
+                >
+                  {loading ? (
+                    <>
+                      <Loader2 className="animate-spin" size={14} />
+                      <span>{isRegistering ? 'Creating Account...' : 'Signing In...'}</span>
+                    </>
+                  ) : (
+                    <>
+                      <span>{isRegistering ? 'Create Account' : 'Sign In'}</span>
+                      <ArrowRight size={14} />
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+          )}
+
+          {/* ========================================================= */}
+          {/* CUSTOMER AUTHENTICATION (OTP MODE)                        */}
+          {/* ========================================================= */}
+          {authRole === 'customer' && authMethod === 'otp' && (
             <>
               {/* STEP 1: Enter Email (or Name + Email for register) */}
               {!otpSent ? (
@@ -374,7 +551,7 @@ const Login = () => {
                     <p className="text-[10px] text-[#8E8E93] mt-1.5 font-mono">
                       {isRegistering
                         ? 'A 6-digit verification code will be sent to activate your account.'
-                        : 'Enter your email to receive a 6-digit access code. New members are registered automatically.'}
+                        : 'Enter your email to receive a 6-digit access code.'}
                     </p>
                   </div>
 
