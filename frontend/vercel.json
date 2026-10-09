@@ -1,6 +1,14 @@
 {
   "rewrites": [
     {
+      "source": "/api/:path*",
+      "destination": "https://nabh-backend-hi3j.onrender.com/api/:path*"
+    },
+    {
+      "source": "/wp-json/:path*",
+      "destination": "https://nabh-backend-hi3j.onrender.com/wp-json/:path*"
+    },
+    {
       "source": "/(.*)",
       "destination": "/index.html"
     }
