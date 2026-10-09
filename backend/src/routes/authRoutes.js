@@ -268,10 +268,18 @@ router.post('/send-otp', async (req, res) => {
       }
     });
 
-    // Send email via nodemailer asynchronously (non-blocking for sub-second UI response)
-    sendOTPEmail(normalizedEmail, otp, effectivePurpose).catch(err => {
-      console.error('[Send OTP Async Mailer Error]:', err.message);
-    });
+    // Send live email via nodemailer
+    const emailResult = await sendOTPEmail(normalizedEmail, otp, effectivePurpose);
+
+    if (!emailResult.success || emailResult.emailSent === false) {
+      console.error('[Send OTP SMTP Failure]:', emailResult.error || emailResult.note);
+      if (emailResult.error) {
+        return res.status(500).json({
+          success: false,
+          message: `Email delivery error: ${emailResult.error}. Please check your Gmail SMTP App Password.`
+        });
+      }
+    }
 
     const message = isNewUser
       ? `Welcome to NABH Wear! A 6-digit verification code has been sent to ${normalizedEmail}.`
@@ -283,8 +291,7 @@ router.post('/send-otp', async (req, res) => {
       email: normalizedEmail,
       purpose: effectivePurpose,
       isNewUser,
-      emailSent: true,
-      devOtp: otp
+      emailSent: true
     });
   } catch (error) {
     console.error('[Send OTP Error]:', error);
