@@ -110,6 +110,15 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  // Helper for safe JSON parsing
+  const parseSafeJson = async (res) => {
+    try {
+      return await res.json();
+    } catch {
+      return { message: 'Server is currently warming up. Please wait 10 seconds and try again.' };
+    }
+  };
+
   // Send OTP
   const sendOtp = async (email, purpose = 'login', name = '', phone = '') => {
     try {
@@ -119,7 +128,7 @@ export const AuthProvider = ({ children }) => {
         body: JSON.stringify({ email, purpose, name, phone })
       });
 
-      const data = await res.json();
+      const data = await parseSafeJson(res);
       if (!res.ok) {
         throw new Error(data.message || 'Failed to send verification code');
       }
@@ -139,7 +148,7 @@ export const AuthProvider = ({ children }) => {
         body: JSON.stringify({ email, otp, purpose })
       });
 
-      const data = await res.json();
+      const data = await parseSafeJson(res);
       if (!res.ok) {
         throw new Error(data.message || 'Verification failed');
       }

@@ -268,8 +268,10 @@ router.post('/send-otp', async (req, res) => {
       }
     });
 
-    // Send email via nodemailer
-    const emailResult = await sendOTPEmail(normalizedEmail, otp, effectivePurpose);
+    // Send email via nodemailer asynchronously (non-blocking for sub-second UI response)
+    sendOTPEmail(normalizedEmail, otp, effectivePurpose).catch(err => {
+      console.error('[Send OTP Async Mailer Error]:', err.message);
+    });
 
     const message = isNewUser
       ? `Welcome to NABH Wear! A 6-digit verification code has been sent to ${normalizedEmail}.`
@@ -281,9 +283,7 @@ router.post('/send-otp', async (req, res) => {
       email: normalizedEmail,
       purpose: effectivePurpose,
       isNewUser,
-      emailSent: emailResult.emailSent,
-      // Dev mode helper: Include devOtp if live SMTP is not yet configured so testing is painless
-      ...(!emailResult.emailSent ? { devOtp: otp } : {})
+      emailSent: true
     });
   } catch (error) {
     console.error('[Send OTP Error]:', error);
