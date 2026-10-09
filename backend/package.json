@@ -1,0 +1,27 @@
+{
+  "name": "nabh-wear-backend",
+  "version": "1.0.0",
+  "description": "Express Backend for NABH Wear",
+  "type": "module",
+  "main": "src/index.js",
+  "scripts": {
+    "dev": "nodemon src/index.js",
+    "start": "node src/index.js",
+    "seed": "node src/seed.js"
+  },
+  "dependencies": {
+    "axios": "^1.7.5",
+    "bcryptjs": "^3.0.3",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "jsonwebtoken": "^9.0.3",
+    "mongoose": "^8.5.3",
+    "nodemailer": "^9.1.1",
+    "razorpay": "^2.9.4",
+    "stripe": "^22.6.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.4"
+  }
+}
