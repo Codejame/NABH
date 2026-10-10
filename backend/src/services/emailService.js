@@ -18,9 +18,9 @@ const getTransporter = () => {
       secure: true,
       family: 4,
       auth: { user: user.trim(), pass: pass.trim().replace(/\s+/g, '') },
-      connectionTimeout: 10000,
-      greetingTimeout: 8000,
-      socketTimeout: 10000
+      connectionTimeout: 4000,
+      greetingTimeout: 3000,
+      socketTimeout: 4000
     });
   }
 
@@ -33,10 +33,38 @@ const getTransporter = () => {
     secure,
     family: 4,
     auth: { user: user.trim(), pass: pass.trim().replace(/\s+/g, '') },
-    connectionTimeout: 10000,
-    greetingTimeout: 8000,
-    socketTimeout: 10000
+    connectionTimeout: 4000,
+    greetingTimeout: 3000,
+    socketTimeout: 4000
   });
+};
+
+// Send email using Resend HTTPS API (bypasses Render's blocked SMTP ports 465/587)
+export const sendViaResend = async (toEmail, subject, html, text) => {
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) return null;
+
+  const from = process.env.RESEND_FROM || process.env.SMTP_FROM || 'NABH Wear <onboarding@resend.dev>';
+  const response = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${apiKey}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      from,
+      to: [toEmail],
+      subject,
+      html,
+      text
+    })
+  });
+
+  const data = await response.json();
+  if (!response.ok) {
+    throw new Error(data.message || 'Resend email failed');
+  }
+  return data;
 };
 
 export const sendOTPEmail = async (toEmail, otp, purpose = 'login') => {
@@ -94,6 +122,25 @@ export const sendOTPEmail = async (toEmail, otp, purpose = 'login') => {
   console.log('==================================================\n');
 
   try {
+    // 1. Try Resend HTTPS API if configured (never blocked by Render)
+    if (process.env.RESEND_API_KEY) {
+      try {
+        const resendData = await sendViaResend(
+          toEmail,
+          subject,
+          html,
+          `Your NABH Wear OTP is: ${otp}. It expires in 10 minutes.`
+        );
+        if (resendData) {
+          console.log(`[EMAIL OTP SERVICE] Live email delivered via Resend API to ${toEmail}. Message ID: ${resendData.id}`);
+          return { success: true, emailSent: true, messageId: resendData.id };
+        }
+      } catch (resendErr) {
+        console.error(`[EMAIL OTP SERVICE] Resend delivery error: ${resendErr.message}`);
+      }
+    }
+
+    // 2. Try SMTP Transporter
     const transporter = getTransporter();
     if (transporter) {
       const fromAddress = process.env.SMTP_FROM || process.env.SMTP_USER || process.env.EMAIL_USER;
