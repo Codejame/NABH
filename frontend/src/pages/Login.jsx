@@ -23,7 +23,7 @@ import {
 const Login = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { login, sendOtp, verifyOtp, user, isAdmin } = useAuth();
+  const { login, register, sendOtp, verifyOtp, user, isAdmin } = useAuth();
 
   const initialRole = searchParams.get('role') === 'admin' ? 'admin' : 'customer';
   const redirectUrl = searchParams.get('redirect') || (initialRole === 'admin' ? '/admin' : '/shop');
