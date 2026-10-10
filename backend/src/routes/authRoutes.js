@@ -236,7 +236,7 @@ router.post('/google', async (req, res) => {
  */
 router.post('/send-otp', async (req, res) => {
   try {
-    const { email, purpose = 'login', name, phone } = req.body;
+    const { email, purpose = 'login', name, phone, password } = req.body;
 
     if (!email || !/\S+@\S+\.\S+/.test(email.trim())) {
       return res.status(400).json({ success: false, message: 'Please enter a valid email address.' });
@@ -246,6 +246,13 @@ router.post('/send-otp', async (req, res) => {
 
     // Check user existence
     const existingUser = await User.findOne({ email: normalizedEmail });
+    if (purpose === 'register' && existingUser) {
+      return res.status(400).json({
+        success: false,
+        message: 'An account with this email already exists. Please sign in instead.'
+      });
+    }
+
     const isNewUser = !existingUser;
 
     // If new user, purpose is 'register'; if existing, purpose is 'login'
@@ -264,7 +271,8 @@ router.post('/send-otp', async (req, res) => {
       purpose: effectivePurpose,
       userData: {
         name: name?.trim() || (isNewUser ? normalizedEmail.split('@')[0] : existingUser?.name || ''),
-        phone: phone?.trim() || existingUser?.phone || ''
+        phone: phone?.trim() || existingUser?.phone || '',
+        password: password || ''
       }
     });
 
@@ -331,18 +339,23 @@ router.post('/verify-otp', async (req, res) => {
     const wasNew = !user;
 
     if (!user) {
-      // Auto-create account for new person!
+      // Auto-create account for new person with their chosen password!
       user = await User.create({
         name: otpRecord.userData?.name || normalizedEmail.split('@')[0],
         email: normalizedEmail,
         phone: otpRecord.userData?.phone || '',
-        password: crypto.randomBytes(16).toString('hex'),
+        password: otpRecord.userData?.password || crypto.randomBytes(16).toString('hex'),
         role: 'customer'
       });
       console.log(`[Auth] New customer account created via OTP: ${normalizedEmail}`);
-    } else if (otpRecord.userData?.name && user.name === normalizedEmail.split('@')[0]) {
-      user.name = otpRecord.userData.name;
-      if (otpRecord.userData.phone && !user.phone) {
+    } else {
+      if (otpRecord.userData?.password) {
+        user.password = otpRecord.userData.password;
+      }
+      if (otpRecord.userData?.name && user.name === normalizedEmail.split('@')[0]) {
+        user.name = otpRecord.userData.name;
+      }
+      if (otpRecord.userData?.phone && !user.phone) {
         user.phone = otpRecord.userData.phone;
       }
       await user.save();

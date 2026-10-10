@@ -120,12 +120,12 @@ export const AuthProvider = ({ children }) => {
   };
 
   // Send OTP
-  const sendOtp = async (email, purpose = 'login', name = '', phone = '') => {
+  const sendOtp = async (email, purpose = 'login', name = '', phone = '', password = '') => {
     try {
       const res = await fetch('/api/auth/send-otp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, purpose, name, phone })
+        body: JSON.stringify({ email, purpose, name, phone, password })
       });
 
       const data = await parseSafeJson(res);

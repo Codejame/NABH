@@ -107,7 +107,7 @@ const Login = () => {
     setSuccessMessage('');
   };
 
-  // Customer Direct Password Authentication (Login & Register)
+  // Customer Direct Password Authentication (Login & Register with OTP)
   const handleCustomerPasswordSubmit = async (e) => {
     e.preventDefault();
     if (!formData.email.trim()) {
@@ -122,35 +122,47 @@ const Login = () => {
       setErrorMessage('Please enter your full name.');
       return;
     }
+    if (isRegistering && formData.password.length < 6) {
+      setErrorMessage('Password must be at least 6 characters long.');
+      return;
+    }
 
     setLoading(true);
     setErrorMessage('');
     setSuccessMessage('');
+    setDevOtpHint('');
 
     try {
       if (isRegistering) {
-        await register(
-          formData.name.trim(),
+        // Send OTP verification to email with registered data & password
+        const res = await sendOtp(
           formData.email.trim(),
-          formData.password,
-          formData.phone.trim()
+          'register',
+          formData.name.trim(),
+          formData.phone.trim(),
+          formData.password
         );
-        setSuccessMessage('Account created successfully! Welcome to NABH Wear.');
+        setOtpSent(true);
+        setCountdown(30);
+        setSuccessMessage(res.message || `Verification code sent to ${formData.email.trim()}`);
+        if (res.devOtp) {
+          setDevOtpHint(res.devOtp);
+        }
       } else {
         await login(formData.email.trim(), formData.password);
         setSuccessMessage('Logged in successfully! Redirecting...');
+        setTimeout(() => {
+          navigate(redirectUrl, { replace: true });
+        }, 500);
       }
-      setTimeout(() => {
-        navigate(redirectUrl, { replace: true });
-      }, 500);
     } catch (err) {
-      setErrorMessage(err.message || (isRegistering ? 'Registration failed.' : 'Invalid email or password.'));
+      setErrorMessage(err.message || (isRegistering ? 'Failed to send verification code.' : 'Invalid email or password.'));
     } finally {
       setLoading(false);
     }
   };
 
-  // Step 1: Send OTP to Email
+  // Step 1: Send OTP to Email (OTP mode sign-in or manual resend)
   const handleSendOtp = async (e) => {
     if (e) e.preventDefault();
     if (!formData.email.trim()) {
@@ -172,12 +184,9 @@ const Login = () => {
         formData.email.trim(),
         isRegistering ? 'register' : 'login',
         formData.name.trim(),
-        formData.phone.trim()
+        formData.phone.trim(),
+        formData.password
       );
-
-      if (res.isNewUser) {
-        setIsRegistering(true);
-      }
 
       setOtpSent(true);
       setCountdown(30);
@@ -358,24 +367,31 @@ const Login = () => {
                 </button>
               </div>
 
-              {/* Toggle Password vs OTP */}
-              <div className="flex items-center justify-between text-[11px] font-mono pt-1">
-                <span className="text-[#8E8E93]">
-                  {authMethod === 'password' ? 'Authenticating with Password' : 'Authenticating with Email OTP'}
-                </span>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setAuthMethod(authMethod === 'password' ? 'otp' : 'password');
-                    setOtpSent(false);
-                    setErrorMessage('');
-                    setSuccessMessage('');
-                  }}
-                  className="text-amber-400 hover:text-amber-300 underline"
-                >
-                  {authMethod === 'password' ? 'Switch to Email OTP ➔' : 'Switch to Password ➔'}
-                </button>
-              </div>
+              {/* Toggle Password vs OTP only on Sign In */}
+              {!otpSent && !isRegistering && (
+                <div className="flex items-center justify-between text-[11px] font-mono pt-1">
+                  <span className="text-[#8E8E93]">
+                    {authMethod === 'password' ? 'Authenticating with Password' : 'Authenticating with Email OTP'}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAuthMethod(authMethod === 'password' ? 'otp' : 'password');
+                      setErrorMessage('');
+                      setSuccessMessage('');
+                    }}
+                    className="text-amber-400 hover:text-amber-300 underline"
+                  >
+                    {authMethod === 'password' ? 'Switch to Email OTP ➔' : 'Switch to Password ➔'}
+                  </button>
+                </div>
+              )}
+
+              {!otpSent && isRegistering && (
+                <div className="text-[11px] font-mono text-[#8E8E93] pt-1">
+                  A 6-digit verification code will be sent to your email to verify and activate your account.
+                </div>
+              )}
             </div>
           )}
 
@@ -395,212 +411,12 @@ const Login = () => {
           )}
 
           {/* ========================================================= */}
-          {/* CUSTOMER AUTHENTICATION (PASSWORD MODE)                   */}
+          {/* CUSTOMER AUTHENTICATION                                   */}
           {/* ========================================================= */}
-          {authRole === 'customer' && authMethod === 'password' && (
-            <form onSubmit={handleCustomerPasswordSubmit} className="space-y-4">
-              {/* Full Name for Register */}
-              {isRegistering && (
-                <div>
-                  <label className="block text-[11px] uppercase tracking-wider font-mono text-[#8E8E93] mb-1.5">
-                    Full Name
-                  </label>
-                  <div className="relative">
-                    <User size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#8E8E93]" />
-                    <input
-                      type="text"
-                      required
-                      placeholder="e.g. Partha Protim Mondal"
-                      value={formData.name}
-                      onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                      className="w-full bg-[#141416] border border-[#26262A] px-10 py-3 text-xs text-[#F9F9FB] placeholder-[#555] focus:outline-none focus:border-[#F9F9FB] transition-colors"
-                    />
-                  </div>
-                </div>
-              )}
-
-              {/* Email Address */}
-              <div>
-                <label className="block text-[11px] uppercase tracking-wider font-mono text-[#8E8E93] mb-1.5">
-                  Email Address
-                </label>
-                <div className="relative">
-                  <Mail size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#8E8E93]" />
-                  <input
-                    type="email"
-                    required
-                    placeholder="you@example.com"
-                    value={formData.email}
-                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                    className="w-full bg-[#141416] border border-[#26262A] px-10 py-3 text-xs text-[#F9F9FB] placeholder-[#555] focus:outline-none focus:border-[#F9F9FB] transition-colors font-mono"
-                  />
-                </div>
-              </div>
-
-              {/* Password */}
-              <div>
-                <label className="block text-[11px] uppercase tracking-wider font-mono text-[#8E8E93] mb-1.5">
-                  {isRegistering ? 'Create Password' : 'Password'}
-                </label>
-                <div className="relative">
-                  <Lock size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#8E8E93]" />
-                  <input
-                    type={showPassword ? 'text' : 'password'}
-                    required
-                    placeholder="••••••••••••"
-                    value={formData.password}
-                    onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                    className="w-full bg-[#141416] border border-[#26262A] pl-10 pr-10 py-3 text-xs text-[#F9F9FB] placeholder-[#555] focus:outline-none focus:border-[#F9F9FB] transition-colors font-mono"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[#8E8E93] hover:text-[#F9F9FB]"
-                  >
-                    {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
-                  </button>
-                </div>
-              </div>
-
-              {/* Mobile Number for Register */}
-              {isRegistering && (
-                <div>
-                  <label className="block text-[11px] uppercase tracking-wider font-mono text-[#8E8E93] mb-1.5">
-                    Mobile Number (Optional)
-                  </label>
-                  <div className="relative">
-                    <Phone size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#8E8E93]" />
-                    <input
-                      type="tel"
-                      placeholder="10-digit mobile number"
-                      value={formData.phone}
-                      onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                      className="w-full bg-[#141416] border border-[#26262A] px-10 py-3 text-xs text-[#F9F9FB] placeholder-[#555] focus:outline-none focus:border-[#F9F9FB] transition-colors font-mono"
-                    />
-                  </div>
-                </div>
-              )}
-
-              {/* Submit Button */}
-              <div className="pt-2">
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="w-full py-3.5 px-6 bg-[#F9F9FB] text-[#0A0A0A] hover:bg-white text-xs uppercase tracking-widest font-mono font-bold flex items-center justify-center gap-2 transition-all disabled:opacity-50"
-                >
-                  {loading ? (
-                    <>
-                      <Loader2 className="animate-spin" size={14} />
-                      <span>{isRegistering ? 'Creating Account...' : 'Signing In...'}</span>
-                    </>
-                  ) : (
-                    <>
-                      <span>{isRegistering ? 'Create Account' : 'Sign In'}</span>
-                      <ArrowRight size={14} />
-                    </>
-                  )}
-                </button>
-              </div>
-            </form>
-          )}
-
-          {/* ========================================================= */}
-          {/* CUSTOMER AUTHENTICATION (OTP MODE)                        */}
-          {/* ========================================================= */}
-          {authRole === 'customer' && authMethod === 'otp' && (
+          {authRole === 'customer' && (
             <>
-              {/* STEP 1: Enter Email (or Name + Email for register) */}
-              {!otpSent ? (
-                <form onSubmit={handleSendOtp} className="space-y-4">
-                  {/* Full Name for Register */}
-                  {isRegistering && (
-                    <div>
-                      <label className="block text-[11px] uppercase tracking-wider font-mono text-[#8E8E93] mb-1.5">
-                        Full Name
-                      </label>
-                      <div className="relative">
-                        <User size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#8E8E93]" />
-                        <input
-                          type="text"
-                          required
-                          placeholder="e.g. Partha Mondal"
-                          value={formData.name}
-                          onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                          className="w-full bg-[#141416] border border-[#26262A] px-10 py-3 text-xs text-[#F9F9FB] placeholder-[#555] focus:outline-none focus:border-[#F9F9FB] transition-colors"
-                        />
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Email Address */}
-                  <div>
-                    <label className="block text-[11px] uppercase tracking-wider font-mono text-[#8E8E93] mb-1.5">
-                      Email Address
-                    </label>
-                    <div className="relative">
-                      <Mail size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#8E8E93]" />
-                      <input
-                        type="email"
-                        required
-                        placeholder="you@example.com"
-                        value={formData.email}
-                        onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                        className="w-full bg-[#141416] border border-[#26262A] px-10 py-3 text-xs text-[#F9F9FB] placeholder-[#555] focus:outline-none focus:border-[#F9F9FB] transition-colors font-mono"
-                      />
-                    </div>
-                    <p className="text-[10px] text-[#8E8E93] mt-1.5 font-mono">
-                      {isRegistering
-                        ? 'A 6-digit verification code will be sent to activate your account.'
-                        : 'Enter your email to receive a 6-digit access code.'}
-                    </p>
-                  </div>
-
-                  {/* Phone for Register (Optional) */}
-                  {isRegistering && (
-                    <div>
-                      <label className="block text-[11px] uppercase tracking-wider font-mono text-[#8E8E93] mb-1.5">
-                        Mobile Number (Optional, for SMS tracking)
-                      </label>
-                      <div className="relative">
-                        <Phone size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#8E8E93]" />
-                        <input
-                          type="tel"
-                          placeholder="10-digit mobile number"
-                          value={formData.phone}
-                          onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                          className="w-full bg-[#141416] border border-[#26262A] px-10 py-3 text-xs text-[#F9F9FB] placeholder-[#555] focus:outline-none focus:border-[#F9F9FB] transition-colors font-mono"
-                        />
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Submit Button */}
-                  <div className="pt-2">
-                    <button
-                      type="submit"
-                      disabled={loading}
-                      className="w-full py-3.5 px-6 bg-[#F9F9FB] text-[#0A0A0A] hover:bg-white text-xs uppercase tracking-widest font-mono font-bold flex items-center justify-center gap-2 transition-all disabled:opacity-50"
-                    >
-                      {loading ? (
-                        <>
-                          <Loader2 className="animate-spin" size={14} />
-                          <span>Sending Verification Code...</span>
-                        </>
-                      ) : (
-                        <>
-                          <span>
-                            {isRegistering
-                              ? 'Send Verification Code'
-                              : 'Send One-Time Password'}
-                          </span>
-                          <ArrowRight size={14} />
-                        </>
-                      )}
-                    </button>
-                  </div>
-                </form>
-              ) : (
-                /* STEP 2: Enter 6-Digit OTP */
+              {/* If OTP sent, render 6-Digit Verification Code Screen */}
+              {otpSent ? (
                 <form onSubmit={handleVerifyOtp} className="space-y-5 animate-fade-in">
                   <div className="bg-[#141416] border border-[#222226] p-4 text-center space-y-2">
                     <div className="inline-flex p-2.5 bg-white/5 border border-white/10 rounded-full text-[#F9F9FB]">
@@ -624,7 +440,7 @@ const Login = () => {
                       }}
                       className="inline-flex items-center gap-1 text-[10px] uppercase font-mono text-[#8E8E93] hover:text-white underline pt-1"
                     >
-                      <Edit3 size={11} /> Change Email
+                      <Edit3 size={11} /> Change Email / Edit Details
                     </button>
                   </div>
 
@@ -705,6 +521,158 @@ const Login = () => {
                         <RefreshCw size={12} /> Resend Verification Code
                       </button>
                     )}
+                  </div>
+                </form>
+              ) : (isRegistering || authMethod === 'password') ? (
+                /* PASSWORD FORM: Create Account (with OTP verification) or Sign In with Password */
+                <form onSubmit={handleCustomerPasswordSubmit} className="space-y-4">
+                  {/* Full Name for Register */}
+                  {isRegistering && (
+                    <div>
+                      <label className="block text-[11px] uppercase tracking-wider font-mono text-[#8E8E93] mb-1.5">
+                        Full Name
+                      </label>
+                      <div className="relative">
+                        <User size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#8E8E93]" />
+                        <input
+                          type="text"
+                          required
+                          placeholder="e.g. Partha Protim Mondal"
+                          value={formData.name}
+                          onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                          className="w-full bg-[#141416] border border-[#26262A] px-10 py-3 text-xs text-[#F9F9FB] placeholder-[#555] focus:outline-none focus:border-[#F9F9FB] transition-colors"
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Email Address */}
+                  <div>
+                    <label className="block text-[11px] uppercase tracking-wider font-mono text-[#8E8E93] mb-1.5">
+                      Email Address
+                    </label>
+                    <div className="relative">
+                      <Mail size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#8E8E93]" />
+                      <input
+                        type="email"
+                        required
+                        placeholder="you@example.com"
+                        value={formData.email}
+                        onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                        className="w-full bg-[#141416] border border-[#26262A] px-10 py-3 text-xs text-[#F9F9FB] placeholder-[#555] focus:outline-none focus:border-[#F9F9FB] transition-colors font-mono"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Password */}
+                  <div>
+                    <label className="block text-[11px] uppercase tracking-wider font-mono text-[#8E8E93] mb-1.5">
+                      {isRegistering ? 'Create Password (min. 6 characters)' : 'Password'}
+                    </label>
+                    <div className="relative">
+                      <Lock size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#8E8E93]" />
+                      <input
+                        type={showPassword ? 'text' : 'password'}
+                        required
+                        minLength={isRegistering ? 6 : undefined}
+                        placeholder="••••••••••••"
+                        value={formData.password}
+                        onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                        className="w-full bg-[#141416] border border-[#26262A] pl-10 pr-10 py-3 text-xs text-[#F9F9FB] placeholder-[#555] focus:outline-none focus:border-[#F9F9FB] transition-colors font-mono"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[#8E8E93] hover:text-[#F9F9FB]"
+                      >
+                        {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Mobile Number for Register */}
+                  {isRegistering && (
+                    <div>
+                      <label className="block text-[11px] uppercase tracking-wider font-mono text-[#8E8E93] mb-1.5">
+                        Mobile Number (Optional)
+                      </label>
+                      <div className="relative">
+                        <Phone size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#8E8E93]" />
+                        <input
+                          type="tel"
+                          placeholder="10-digit mobile number"
+                          value={formData.phone}
+                          onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                          className="w-full bg-[#141416] border border-[#26262A] px-10 py-3 text-xs text-[#F9F9FB] placeholder-[#555] focus:outline-none focus:border-[#F9F9FB] transition-colors font-mono"
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Submit Button */}
+                  <div className="pt-2">
+                    <button
+                      type="submit"
+                      disabled={loading}
+                      className="w-full py-3.5 px-6 bg-[#F9F9FB] text-[#0A0A0A] hover:bg-white text-xs uppercase tracking-widest font-mono font-bold flex items-center justify-center gap-2 transition-all disabled:opacity-50"
+                    >
+                      {loading ? (
+                        <>
+                          <Loader2 className="animate-spin" size={14} />
+                          <span>{isRegistering ? 'Sending Code...' : 'Signing In...'}</span>
+                        </>
+                      ) : (
+                        <>
+                          <span>{isRegistering ? 'Create Account' : 'Sign In'}</span>
+                          <ArrowRight size={14} />
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </form>
+              ) : (
+                /* OTP SIGN IN FORM: Passwordless Sign In for existing users */
+                <form onSubmit={handleSendOtp} className="space-y-4">
+                  {/* Email Address */}
+                  <div>
+                    <label className="block text-[11px] uppercase tracking-wider font-mono text-[#8E8E93] mb-1.5">
+                      Email Address
+                    </label>
+                    <div className="relative">
+                      <Mail size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#8E8E93]" />
+                      <input
+                        type="email"
+                        required
+                        placeholder="you@example.com"
+                        value={formData.email}
+                        onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                        className="w-full bg-[#141416] border border-[#26262A] px-10 py-3 text-xs text-[#F9F9FB] placeholder-[#555] focus:outline-none focus:border-[#F9F9FB] transition-colors font-mono"
+                      />
+                    </div>
+                    <p className="text-[10px] text-[#8E8E93] mt-1.5 font-mono">
+                      Enter your email to receive a 6-digit access code.
+                    </p>
+                  </div>
+
+                  {/* Submit Button */}
+                  <div className="pt-2">
+                    <button
+                      type="submit"
+                      disabled={loading}
+                      className="w-full py-3.5 px-6 bg-[#F9F9FB] text-[#0A0A0A] hover:bg-white text-xs uppercase tracking-widest font-mono font-bold flex items-center justify-center gap-2 transition-all disabled:opacity-50"
+                    >
+                      {loading ? (
+                        <>
+                          <Loader2 className="animate-spin" size={14} />
+                          <span>Sending Verification Code...</span>
+                        </>
+                      ) : (
+                        <>
+                          <span>Send One-Time Password</span>
+                          <ArrowRight size={14} />
+                        </>
+                      )}
+                    </button>
                   </div>
                 </form>
               )}
