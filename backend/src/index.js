@@ -1,6 +1,12 @@
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import dns from 'dns';
+
+// Force IPv4 first to prevent ENETUNREACH on cloud hosts without IPv6 (e.g. Render)
+if (dns.setDefaultResultOrder) {
+  dns.setDefaultResultOrder('ipv4first');
+}
 import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';

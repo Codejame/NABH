@@ -10,14 +10,17 @@ const getTransporter = () => {
 
   const host = process.env.SMTP_HOST || 'smtp.gmail.com';
 
-  // For Gmail, using the 'gmail' service with SSL is significantly faster and avoids port 587 cloud latency
+  // For Gmail, using smtp.gmail.com with SSL and family: 4 forces IPv4 to avoid ENETUNREACH on cloud platforms
   if (host.includes('gmail')) {
     return nodemailer.createTransport({
-      service: 'gmail',
+      host: 'smtp.gmail.com',
+      port: 465,
+      secure: true,
+      family: 4,
       auth: { user: user.trim(), pass: pass.trim().replace(/\s+/g, '') },
-      connectionTimeout: 8000,
-      greetingTimeout: 5000,
-      socketTimeout: 8000
+      connectionTimeout: 10000,
+      greetingTimeout: 8000,
+      socketTimeout: 10000
     });
   }
 
@@ -28,10 +31,11 @@ const getTransporter = () => {
     host,
     port,
     secure,
+    family: 4,
     auth: { user: user.trim(), pass: pass.trim().replace(/\s+/g, '') },
-    connectionTimeout: 8000,
-    greetingTimeout: 5000,
-    socketTimeout: 8000
+    connectionTimeout: 10000,
+    greetingTimeout: 8000,
+    socketTimeout: 10000
   });
 };
 
